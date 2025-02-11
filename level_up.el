@@ -189,7 +189,7 @@
         (insert-image (level-up-make-progress-svg current target))
         (insert (format "    %d/%d\n\n" current target))))))
 
-(defun level-up ()
+(defun level_up ()
   "Open the Level Up habit tracker buffer."
   (interactive)
   (let ((buffer (get-buffer-create "*level_up*")))
