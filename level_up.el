@@ -131,22 +131,22 @@
           (svg-rectangle svg 0 y-padding
                          completed-width
                          block-height
-                         :fill "#edf2f7")
+                         :fill "#0c0a0d")
         (dotimes (i target)
           (let ((x (* i (+ block-width block-gap))))
             (svg-rectangle svg x y-padding block-width block-height
-                           :fill "#edf2f7"))))
+                           :fill "#0c0a0d"))))
 
       ;; Progress
       (if (>= current target)
           (svg-rectangle svg 0 y-padding
                          completed-width
                          block-height
-                         :fill "#32a860")
+                         :fill "#b4f9f8")
         (dotimes (i (min current target))
           (let ((x (* i (+ block-width block-gap))))
             (svg-rectangle svg x y-padding block-width block-height
-                           :fill "#4299e1"))))
+                           :fill "#e0af68"))))
 
       ;; Overflow blocks
       (when (> current target)
@@ -154,7 +154,7 @@
           (let ((x (+ completed-width block-gap
                       (* i (+ block-width block-gap)))))
             (svg-rectangle svg x y-padding block-width block-height
-                           :fill "#9f7aea"))))
+                           :fill "#bb9af7"))))
 
       (svg-image svg :ascent 'center))))
 
@@ -163,7 +163,19 @@
   (let ((habits (level-up-parse-habits))
         (inhibit-read-only t))
     (erase-buffer)
-    (insert "\n  level_up\n\n")
+
+    (insert "\n    ")
+    ;; Insert header and track position
+    (let ((start-pos (point)))
+      (insert "level_up")
+      (let ((end-pos (point)))
+        ;; Create overlay with all our properties
+        (overlay-put (make-overlay start-pos end-pos)
+                     'face '(:weight bold :slant italic))
+        ;; Add height separately
+        (put-text-property start-pos end-pos
+                           'display '(height 3.2))))
+    (insert "\n\n")
 
     (dolist (habit habits)
       (let* ((name (car habit))
@@ -171,23 +183,24 @@
              (current (car progress))
              (target (cadr progress))
              (level (level-up-calculate-level habit)))
-        (insert (format "  %s [level %d]\n  "
+        (insert (format "    %s [level %d]\n    "
                         (downcase name)
                         level))
         (insert-image (level-up-make-progress-svg current target))
-        (insert (format "  %d/%d\n\n" current target))))))
+        (insert (format "    %d/%d\n\n" current target))))))
 
 (defun level-up ()
   "Open the Level Up habit tracker buffer."
   (interactive)
-  (let ((buffer (get-buffer-create "*Level Up*")))
+  (let ((buffer (get-buffer-create "*level_up*")))
     (with-current-buffer buffer
       (org-mode)
       (setq-local display-line-numbers nil)
       (read-only-mode 1)
-      (face-remap-add-relative 'default :family "Helvetica")
+      (face-remap-add-relative 'default :family "Exo")
       (dolist (face '(org-level-1 org-level-2 org-level-3))
-        (face-remap-add-relative face :family "Helvetica"))
+        (face-remap-add-relative face :family "Exo"))
+      (text-scale-set 1.3)
       (level-up-render-buffer))
     (switch-to-buffer buffer)))
 
