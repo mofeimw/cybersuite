@@ -37,8 +37,8 @@
 (defun justdoit-format-time (seconds)
   "Format SECONDS into MM:SS string."
   (format "%02d:%02d"
-          (/ seconds 60)
-          (mod seconds 60)))
+          (floor (/ (ceiling seconds) 60))
+          (floor (mod (ceiling seconds) 60))))
 
 (defun justdoit-render-buffer ()
   "Update the timer display."

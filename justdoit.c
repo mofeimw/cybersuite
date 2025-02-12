@@ -43,23 +43,23 @@ void quit_callback(id self, SEL _cmd, id timer);
 void update_progress_color(float percentage) {
     id color;
     if (percentage > 50.0) {
-        // Green
+        // Cyan
         color = ((id (*)(id, SEL, CGFloat, CGFloat, CGFloat, CGFloat))objc_msgSend)(
                 (id)objc_getClass("NSColor"),
                 sel_registerName("colorWithRed:green:blue:alpha:"),
-                0.0, 1.0, 0.0, 1.0);
+                0.533, 0.82, 0.62, 1.0);
     } else if (percentage > 20.0) {
         // Yellow
         color = ((id (*)(id, SEL, CGFloat, CGFloat, CGFloat, CGFloat))objc_msgSend)(
                 (id)objc_getClass("NSColor"),
                 sel_registerName("colorWithRed:green:blue:alpha:"),
-                1.0, 1.0, 0.0, 1.0);
+                1.0, 0.89, 0.569, 1.0);
     } else {
         // Red
         color = ((id (*)(id, SEL, CGFloat, CGFloat, CGFloat, CGFloat))objc_msgSend)(
                 (id)objc_getClass("NSColor"),
                 sel_registerName("colorWithRed:green:blue:alpha:"),
-                1.0, 0.0, 0.0, 1.0);
+                0.969, 0.463, 0.557, 1.0);
     }
 
     id layer = ((id (*)(id, SEL))objc_msgSend)(g_progressView,
@@ -105,7 +105,7 @@ void timer_callback(id self, SEL _cmd, id timer) {
             str = ((id (*)(id, SEL, const char *))objc_msgSend)(
                     (id)objc_getClass("NSString"),
                     sel_registerName("stringWithUTF8String:"),
-                    "[completed]");
+                    "done");
 
             ((void (*)(id, SEL, id))objc_msgSend)(g_timerField,
                 sel_registerName("setStringValue:"),
@@ -117,7 +117,7 @@ void timer_callback(id self, SEL _cmd, id timer) {
             ((void (*)(id, SEL, double, id, SEL, id, BOOL))objc_msgSend)(
                 (id)objc_getClass("NSTimer"),
                 sel_registerName("scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:"),
-                60.0,
+                240.0,
                 self,
                 sel_registerName("quitCallback"),
                 nil,
@@ -205,6 +205,14 @@ int main(int argc, char *argv[]) {
         sel_registerName("setLevel:"),
         100);
 
+    // Show in all workspaces
+    ((void (*)(id, SEL, BOOL))objc_msgSend)(window,
+        sel_registerName("setCollectionBehavior:"),
+        0x400);
+    ((void (*)(id, SEL, BOOL))objc_msgSend)(window,
+        sel_registerName("setHidesOnDeactivate:"),
+        NO);
+
     id blackColor = ((id (*)(id, SEL))objc_msgSend)((id)objc_getClass("NSColor"),
             sel_registerName("blackColor"));
     ((void (*)(id, SEL, id))objc_msgSend)(window,
@@ -268,10 +276,14 @@ int main(int argc, char *argv[]) {
 
     id whiteColor = ((id (*)(id, SEL))objc_msgSend)((id)objc_getClass("NSColor"),
             sel_registerName("whiteColor"));
+    id barBgColor = ((id (*)(id, SEL, CGFloat, CGFloat, CGFloat, CGFloat))objc_msgSend)(
+            (id)objc_getClass("NSColor"),
+            sel_registerName("colorWithRed:green:blue:alpha:"),
+            0.3, 0.3, 0.3, 1.0);
     ((void (*)(id, SEL, CGColorRef))objc_msgSend)(((id (*)(id, SEL))objc_msgSend)(bgView,
             sel_registerName("layer")),
         sel_registerName("setBackgroundColor:"),
-        ((CGColorRef (*)(id, SEL))objc_msgSend)(whiteColor,
+        ((CGColorRef (*)(id, SEL))objc_msgSend)(barBgColor,
             sel_registerName("CGColor")));
 
     // Create progress view (colored)
@@ -333,25 +345,10 @@ int main(int argc, char *argv[]) {
         sel_registerName("addSubview:"),
         g_timerField);
 
-    ((void (*)(id, SEL, id))objc_msgSend)(window,
-        sel_registerName("makeKeyAndOrderFront:"),
-        nil);
-    ((void (*)(id, SEL, BOOL))objc_msgSend)(NSApp,
-        sel_registerName("activateIgnoringOtherApps:"),
-        (BOOL)YES);
+    // Fire timer callback immediately to initialize display
+    timer_callback(g_timerDelegate, sel_registerName("timerFired:"), nil);
 
-    char displayStr[MAX_LINE_LENGTH];
-    int minutes = g_remainingSeconds / 60;
-    int seconds = g_remainingSeconds % 60;
-    snprintf(displayStr, sizeof(displayStr), "%02d:%02d", minutes, seconds);
-    id str = ((id (*)(id, SEL, const char *))objc_msgSend)(
-            (id)objc_getClass("NSString"),
-            sel_registerName("stringWithUTF8String:"),
-            displayStr);
-    ((void (*)(id, SEL, id))objc_msgSend)(g_timerField,
-        sel_registerName("setStringValue:"),
-        str);
-
+    // Start the repeating timer
     g_timer = ((id (*)(id, SEL, double, id, SEL, id, BOOL))objc_msgSend)(
             (id)objc_getClass("NSTimer"),
             sel_registerName("scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:"),
@@ -360,6 +357,14 @@ int main(int argc, char *argv[]) {
             sel_registerName("timerFired:"),
             nil,
             YES);
+
+    // Show window after timer is set up
+    ((void (*)(id, SEL, id))objc_msgSend)(window,
+        sel_registerName("makeKeyAndOrderFront:"),
+        nil);
+    ((void (*)(id, SEL, BOOL))objc_msgSend)(NSApp,
+        sel_registerName("activateIgnoringOtherApps:"),
+        (BOOL)YES);
 
     ((void (*)(id, SEL))objc_msgSend)(NSApp, sel_registerName("run"));
     return 0;
