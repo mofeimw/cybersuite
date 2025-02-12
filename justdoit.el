@@ -99,6 +99,12 @@
             justdoit-duration (read-number "Duration (minutes): ")
             justdoit-start-time (float-time))
 
+      ;; Call heads-up UI executable if it exists
+      (let ((executable-path (expand-file-name "~/justdoit")))
+        (if (and (file-exists-p executable-path)
+                 (file-executable-p executable-path))
+            (start-process "test" nil executable-path justdoit-task-name (number-to-string justdoit-duration))))
+
       ;; Create and setup buffer
       (let ((buffer (get-buffer-create justdoit-buffer-name)))
         (with-current-buffer buffer
