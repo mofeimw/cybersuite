@@ -15,7 +15,7 @@ typedef double CGFloat;
 typedef struct CGRect NSRect;
 
 #define MAX_LINE_LENGTH 1024
-#define PADDING 8
+#define PADDING 2
 #define PROGRESS_HEIGHT 11
 #define MIN_WINDOW_WIDTH 400
 #define MIN_PROGRESS_WIDTH 100
@@ -47,7 +47,7 @@ void timer_callback(id self, SEL _cmd, id timer) {
         int seconds = g_remainingSeconds % 60;
 
         // Combine task name and timer
-        snprintf(displayStr, sizeof(displayStr), "%s  %2d:%02d", g_activity, minutes, seconds);
+        snprintf(displayStr, sizeof(displayStr), "%s   %2d:%02d", g_activity, minutes, seconds);
 
         id str = ((id (*)(id, SEL, const char *))objc_msgSend)(
                 (id)objc_getClass("NSString"),
@@ -69,7 +69,7 @@ void timer_callback(id self, SEL _cmd, id timer) {
         update_progress_color(percentage);
 
         if (g_remainingSeconds == 0) {
-            snprintf(displayStr, sizeof(displayStr), "%s  done", g_activity);
+            snprintf(displayStr, sizeof(displayStr), "%s   done", g_activity);
             str = ((id (*)(id, SEL, const char *))objc_msgSend)(
                     (id)objc_getClass("NSString"),
                     sel_registerName("stringWithUTF8String:"),
@@ -175,9 +175,14 @@ int main(int argc, char *argv[]) {
 
     // Calculate initial display string to get proper width
     char initialStr[MAX_LINE_LENGTH];
-    snprintf(initialStr, sizeof(initialStr), "%s 00:00", g_activity);
-    CGSize textSize = measure_text(initialStr, systemFont);
-    g_taskWidth = textSize.width + 5;
+    // Calculate space needed for longest possible string
+    snprintf(initialStr, sizeof(initialStr), "%s   00:00", g_activity);
+    CGSize timeSize = measure_text(initialStr, systemFont);
+    // Also check "done" variant
+    snprintf(initialStr, sizeof(initialStr), "%s   done", g_activity);
+    CGSize doneSize = measure_text(initialStr, systemFont);
+    // Use the larger of the two sizes
+    g_taskWidth = (timeSize.width > doneSize.width ? timeSize.width : doneSize.width) + 13;
 
     g_windowWidth = g_taskWidth + MIN_PROGRESS_WIDTH + PADDING;
     if (g_windowWidth < MIN_WINDOW_WIDTH) g_windowWidth = MIN_WINDOW_WIDTH;
