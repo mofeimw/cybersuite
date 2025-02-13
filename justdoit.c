@@ -15,15 +15,13 @@ typedef double CGFloat;
 typedef struct CGRect NSRect;
 
 #define MAX_LINE_LENGTH 1024
-#define PADDING 20
+#define PADDING 8
 #define PROGRESS_HEIGHT 11
 #define MIN_WINDOW_WIDTH 400
-#define TIMER_WIDTH 70
 #define MIN_PROGRESS_WIDTH 100
 
 id g_textField = nil;
 id g_progressView = nil;
-id g_timerField = nil;
 int g_remainingSeconds = 0;
 int g_initialSeconds = 0;
 char g_activity[MAX_LINE_LENGTH];
@@ -40,10 +38,66 @@ void update_progress_color(float percentage);
 void timer_callback(id self, SEL _cmd, id timer);
 void quit_callback(id self, SEL _cmd, id timer);
 
+void timer_callback(id self, SEL _cmd, id timer) {
+    if (g_remainingSeconds >= 0) {
+        g_remainingSeconds--;
+
+        char displayStr[MAX_LINE_LENGTH];
+        int minutes = g_remainingSeconds / 60;
+        int seconds = g_remainingSeconds % 60;
+
+        // Combine task name and timer
+        snprintf(displayStr, sizeof(displayStr), "%s  %2d:%02d", g_activity, minutes, seconds);
+
+        id str = ((id (*)(id, SEL, const char *))objc_msgSend)(
+                (id)objc_getClass("NSString"),
+                sel_registerName("stringWithUTF8String:"),
+                displayStr);
+
+        ((void (*)(id, SEL, id))objc_msgSend)(g_textField,
+            sel_registerName("setStringValue:"),
+            str);
+
+        CGRect frame = ((CGRect (*)(id, SEL))objc_msgSend)(g_progressView,
+                sel_registerName("frame"));
+        frame.size.width = (g_remainingSeconds * g_progressWidth) / g_initialSeconds;
+        ((void (*)(id, SEL, CGRect))objc_msgSend)(g_progressView,
+            sel_registerName("setFrame:"),
+            frame);
+
+        float percentage = (g_remainingSeconds * 100.0) / g_initialSeconds;
+        update_progress_color(percentage);
+
+        if (g_remainingSeconds == 0) {
+            snprintf(displayStr, sizeof(displayStr), "%s  done", g_activity);
+            str = ((id (*)(id, SEL, const char *))objc_msgSend)(
+                    (id)objc_getClass("NSString"),
+                    sel_registerName("stringWithUTF8String:"),
+                    displayStr);
+
+            ((void (*)(id, SEL, id))objc_msgSend)(g_textField,
+                sel_registerName("setStringValue:"),
+                str);
+
+            ((void (*)(id, SEL))objc_msgSend)(timer,
+                sel_registerName("invalidate"));
+
+            ((void (*)(id, SEL, double, id, SEL, id, BOOL))objc_msgSend)(
+                (id)objc_getClass("NSTimer"),
+                sel_registerName("scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:"),
+                240.0,
+                self,
+                sel_registerName("quitCallback"),
+                nil,
+                NO);
+        }
+    }
+}
+
 void update_progress_color(float percentage) {
     id color;
     if (percentage > 50.0) {
-        // Cyan
+        // Green
         color = ((id (*)(id, SEL, CGFloat, CGFloat, CGFloat, CGFloat))objc_msgSend)(
                 (id)objc_getClass("NSColor"),
                 sel_registerName("colorWithRed:green:blue:alpha:"),
@@ -74,60 +128,6 @@ void quit_callback(id self, SEL _cmd, id timer) {
     exit(0);
 }
 
-void timer_callback(id self, SEL _cmd, id timer) {
-    if (g_remainingSeconds >= 0) {
-        char displayStr[MAX_LINE_LENGTH];
-        int minutes = g_remainingSeconds / 60;
-        int seconds = g_remainingSeconds % 60;
-        snprintf(displayStr, sizeof(displayStr), "%02d:%02d", minutes, seconds);
-
-        id str = ((id (*)(id, SEL, const char *))objc_msgSend)(
-                (id)objc_getClass("NSString"),
-                sel_registerName("stringWithUTF8String:"),
-                displayStr);
-
-        ((void (*)(id, SEL, id))objc_msgSend)(g_timerField,
-            sel_registerName("setStringValue:"),
-            str);
-
-        CGRect frame = ((CGRect (*)(id, SEL))objc_msgSend)(g_progressView,
-                sel_registerName("frame"));
-        frame.origin.x = g_progressStartX;
-        frame.size.width = (g_remainingSeconds * g_progressWidth) / g_initialSeconds;
-        ((void (*)(id, SEL, CGRect))objc_msgSend)(g_progressView,
-            sel_registerName("setFrame:"),
-            frame);
-
-        float percentage = (g_remainingSeconds * 100.0) / g_initialSeconds;
-        update_progress_color(percentage);
-
-        if (g_remainingSeconds == 0) {
-            str = ((id (*)(id, SEL, const char *))objc_msgSend)(
-                    (id)objc_getClass("NSString"),
-                    sel_registerName("stringWithUTF8String:"),
-                    "done");
-
-            ((void (*)(id, SEL, id))objc_msgSend)(g_timerField,
-                sel_registerName("setStringValue:"),
-                str);
-
-            ((void (*)(id, SEL))objc_msgSend)(timer,
-                sel_registerName("invalidate"));
-
-            ((void (*)(id, SEL, double, id, SEL, id, BOOL))objc_msgSend)(
-                (id)objc_getClass("NSTimer"),
-                sel_registerName("scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:"),
-                240.0,
-                self,
-                sel_registerName("quitCallback"),
-                nil,
-                NO);
-        }
-
-        g_remainingSeconds--;
-    }
-}
-
 CGSize measure_text(const char* text, id font) {
     id str = ((id (*)(id, SEL, const char *))objc_msgSend)(
             (id)objc_getClass("NSString"),
@@ -154,7 +154,7 @@ int main(int argc, char *argv[]) {
     }
 
     strncpy(g_activity, argv[1], MAX_LINE_LENGTH);
-    g_remainingSeconds = atoi(argv[2]) * 60;
+    g_remainingSeconds = atoi(argv[2]) * 60 + 1; // Compensate for losing first tick
     g_initialSeconds = g_remainingSeconds;
 
     id NSApp = ((id (*)(id, SEL))objc_msgSend)((id)objc_getClass("NSApplication"),
@@ -173,9 +173,13 @@ int main(int argc, char *argv[]) {
             sel_registerName("systemFontOfSize:"),
             13.5);
 
-    CGSize textSize = measure_text(g_activity, systemFont);
-    g_taskWidth = textSize.width + 10;
-    g_windowWidth = g_taskWidth + MIN_PROGRESS_WIDTH + TIMER_WIDTH + (PADDING * 4);
+    // Calculate initial display string to get proper width
+    char initialStr[MAX_LINE_LENGTH];
+    snprintf(initialStr, sizeof(initialStr), "%s 00:00", g_activity);
+    CGSize textSize = measure_text(initialStr, systemFont);
+    g_taskWidth = textSize.width + 5;
+
+    g_windowWidth = g_taskWidth + MIN_PROGRESS_WIDTH + PADDING;
     if (g_windowWidth < MIN_WINDOW_WIDTH) g_windowWidth = MIN_WINDOW_WIDTH;
 
     id window = ((id (*)(id, SEL))objc_msgSend)((id)objc_getClass("NSWindow"),
@@ -221,7 +225,7 @@ int main(int argc, char *argv[]) {
 
     g_textField = ((id (*)(id, SEL))objc_msgSend)((id)objc_getClass("NSTextField"),
             sel_registerName("alloc"));
-    CGRect textFrame = CGRectMake(PADDING, (windowHeight - 20) / 2,
+    CGRect textFrame = CGRectMake(0, (windowHeight - 20) / 2,
             g_taskWidth,
             20);
     g_textField = ((id (*)(id, SEL, CGRect))objc_msgSend)(
@@ -246,20 +250,11 @@ int main(int argc, char *argv[]) {
         sel_registerName("setBezeled:"),
         NO);
 
-    id taskStr = ((id (*)(id, SEL, const char *))objc_msgSend)(
-            (id)objc_getClass("NSString"),
-            sel_registerName("stringWithUTF8String:"),
-            g_activity);
-    ((void (*)(id, SEL, id))objc_msgSend)(g_textField,
-        sel_registerName("setStringValue:"),
-        taskStr);
-
     // Calculate exact positions for progress bar
-    CGFloat timerX = g_windowWidth - TIMER_WIDTH - PADDING;
-    g_progressStartX = PADDING + g_taskWidth + PADDING;
-    g_progressWidth = timerX - g_progressStartX;
+    g_progressStartX = g_taskWidth + PADDING;
+    g_progressWidth = g_windowWidth - g_progressStartX;
 
-    // Create background view (white)
+    // Create progress view (background)
     id bgView = ((id (*)(id, SEL))objc_msgSend)((id)objc_getClass("NSView"),
             sel_registerName("alloc"));
     CGRect progressFrame = CGRectMake(g_progressStartX,
@@ -279,7 +274,7 @@ int main(int argc, char *argv[]) {
     id barBgColor = ((id (*)(id, SEL, CGFloat, CGFloat, CGFloat, CGFloat))objc_msgSend)(
             (id)objc_getClass("NSColor"),
             sel_registerName("colorWithRed:green:blue:alpha:"),
-            0.3, 0.3, 0.3, 1.0);
+            0.125, 0.110, 0.129, 1.0);
     ((void (*)(id, SEL, CGColorRef))objc_msgSend)(((id (*)(id, SEL))objc_msgSend)(bgView,
             sel_registerName("layer")),
         sel_registerName("setBackgroundColor:"),
@@ -300,36 +295,6 @@ int main(int argc, char *argv[]) {
     // Set initial color to green
     update_progress_color(100.0);
 
-    g_timerField = ((id (*)(id, SEL))objc_msgSend)((id)objc_getClass("NSTextField"),
-            sel_registerName("alloc"));
-    CGRect timerFrame = CGRectMake(timerX,
-            (windowHeight - 20) / 2,
-            TIMER_WIDTH,
-            20);
-    g_timerField = ((id (*)(id, SEL, CGRect))objc_msgSend)(
-            g_timerField,
-            sel_registerName("initWithFrame:"),
-            timerFrame);
-
-    ((void (*)(id, SEL, id))objc_msgSend)(g_timerField,
-        sel_registerName("setFont:"),
-        systemFont);
-    ((void (*)(id, SEL, id))objc_msgSend)(g_timerField,
-        sel_registerName("setTextColor:"),
-        whiteColor);
-    ((void (*)(id, SEL, id))objc_msgSend)(g_timerField,
-        sel_registerName("setBackgroundColor:"),
-        blackColor);
-    ((void (*)(id, SEL, BOOL))objc_msgSend)(g_timerField,
-        sel_registerName("setEditable:"),
-        NO);
-    ((void (*)(id, SEL, BOOL))objc_msgSend)(g_timerField,
-        sel_registerName("setBezeled:"),
-        NO);
-    ((void (*)(id, SEL, NSInteger))objc_msgSend)(g_timerField,
-        sel_registerName("setAlignment:"),
-        2);
-
     id contentView = ((id (*)(id, SEL))objc_msgSend)(window,
             sel_registerName("contentView"));
     ((void (*)(id, SEL, id))objc_msgSend)(contentView,
@@ -341,9 +306,6 @@ int main(int argc, char *argv[]) {
     ((void (*)(id, SEL, id))objc_msgSend)(contentView,
         sel_registerName("addSubview:"),
         g_progressView);
-    ((void (*)(id, SEL, id))objc_msgSend)(contentView,
-        sel_registerName("addSubview:"),
-        g_timerField);
 
     // Fire timer callback immediately to initialize display
     timer_callback(g_timerDelegate, sel_registerName("timerFired:"), nil);
